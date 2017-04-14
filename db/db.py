@@ -36,6 +36,6 @@ class DbMongo():
         """
         self.connect_db()
         account = self.db[AccountModel.COLLECTION_NAME]
-        account.create_index(AccountModel.PROFILES + "." + AccountModel.PARENT + "." + AccountModel.EMAIL,
-                             unique=True)
+        #account.create_index(AccountModel.PROFILES + "." + AccountModel.PARENT + "." + AccountModel.EMAIL,
+        #                     unique=True)
         self.close_db()

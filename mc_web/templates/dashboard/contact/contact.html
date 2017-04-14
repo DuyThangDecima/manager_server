@@ -1,0 +1,59 @@
+
+
+
+
+
+<link href="{{ url_for('static', filename='css/dashboard.css') }}" rel="stylesheet">
+
+{% extends 'dashboard/main.html' %}
+{% block page_content %}
+    <div class="right_col" role="main">
+
+        <div class="row">
+            <div class="col-md-12 col-sm-12 col-xs-12">
+                <div class="dashboard_graph">
+
+                    <div class="row x_title">
+                        <div class="row">
+                            <h3>
+                                Tin nhắn trên thiết bị Sony
+                            </h3>
+                        </div>
+                    </div>
+
+                    <div class="row title">
+                        {#                        <div id="chart_plot_01" class="demo-placeholder"></div>#}
+                        {#                        <div id="chatbox">#}
+                        <div>
+                            <div class="search-sms">
+                                <img src="{{ url_for('static', filename='img/search.png') }}"/>
+                                <input type="text" placeholder="Tìm kiếm"/>
+                            </div>
+
+                            <div class="list-items">
+                                {% for contact in list_contact %}
+                                    <a class="item-content">
+                                            <img src="{{ url_for('static', filename='img/user.png') }}">
+                                            <span>
+                                                <span style="float: right; padding-right: 15px">{{ contact['email'] }}</span>
+                                                <strong>{{ contact['contact_name'] }}</strong>
+                                                <br>
+                                                <span>{{ contact['phone_number'] }}</span>
+                                            </span>
+                                        {#                                            <div class="status inactive"></div>#}
+                                    </a>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {#                        </div>#}
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="clearfix"></div>
+    </div>
+
+    <br/>
+
+{% endblock %}
+<script src="{{ url_for('static', filename='js/sms.js') }}"></script>

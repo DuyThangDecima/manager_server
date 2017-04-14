@@ -1,0 +1,54 @@
+{% block css_content %}
+    <link href="{{ url_for('static', filename='css/dashboard.css') }}" rel="stylesheet">
+{% endblock %}
+
+{% extends 'dashboard/main.html' %}
+{% block page_content %}
+    <div class="right_col" role="main">
+
+        <div class="row">
+            <div class="col-md-12 col-sm-12 col-xs-12">
+                <div class="dashboard_graph">
+
+                    <div class="row x_title">
+                        <div class="row">
+                            <h3>
+                                Tin nhắn trên thiết bị Sony
+                            </h3>
+                        </div>
+                    </div>
+
+                    <div class="row title">
+                        <div>
+                            <div class="search-sms">
+                                <img src="{{ url_for('static', filename='img/search.png') }}"/>
+                                <input type="text" placeholder="Tìm kiếm"/>
+                            </div>
+
+                            <div class="list-items">
+                                {% for app in list_app %}
+                                    <div class="item-content" style="cursor: default">
+                                        <img src="{{ url_for('static', filename='img/user.png') }}">
+                                        <span>
+
+                                                <a href="googleplay.{{ app['package_name'] }}"
+                                                   style="float: right; padding-right: 15px">Chi tiết</a>
+                                                <strong>{{ app['app_name'] }}</strong>
+                                                <br>
+                                                <span>{{ app['version'] }}</span>
+                                            </span>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {#                        </div>#}
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="clearfix"></div>
+    </div>
+
+    <br/>
+
+{% endblock %}

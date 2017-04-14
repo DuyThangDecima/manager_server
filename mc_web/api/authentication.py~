@@ -1,0 +1,265 @@
+# -*- coding: utf-8 -*-
+
+__author__ = 'ThangLD'
+import json
+
+import utils
+from bson import ObjectId
+from db.db import DbMongo
+from flask_restful import Resource, request
+from model.model_db import DeviceModel, AccountModel, SmsModel
+
+
+class AuthenticationApi(Resource):
+    def post(self):
+        """
+        Authenticate login
+        :return:
+        True,_id neu co tai khoan
+        False,Exception neu khong co tai khoang
+        """
+        # parser = reqparse.RequestParser()
+        # parser.add_argument('username')
+        # parser.add_argument('password')
+        # args = parser.parse_args()
+        email = request.values['email']
+        password = request.values['password']
+        imei = request.values['imei']
+        device_name = request.values['device_name']
+
+        db_mongo = DbMongo()
+        db_mongo.connect_db()
+        device_model = DeviceModel(db_mongo.db)
+        account_model = AccountModel(db_mongo.db)
+        # Tìm trong db
+        ac_status, ac_value = account_model.auth(email, password)
+        if not ac_status:
+            db_mongo.close_db()
+            return utils.notfiy_db_error()
+
+        if ac_value is not None and len(ac_value) > 0:
+            # Nếu tài khoản tồn tại
+            # danh sách các thiết bị đăng nhập
+
+            dev_status, dev_value = device_model.find_one(spec={
+                device_model.ACCOUNT_ID: ac_value[account_model._ID],
+                device_model.DEVICES + "." + device_model.INFOR + "." + device_model.IMEI: imei,
+                device_model.DEVICES + "." + device_model.INFOR + "." + device_model.DEVICE_NAME: device_name,
+            })
+            if not dev_status:
+                # query db mà lỗi là trả về lỗi luôn
+                return utils.notfiy_db_error()
+
+            token = device_model.generate_token()
+            if dev_value is not None and len(dev_value) > 0:
+                # Đã đăng nhập từ trước, chỉ cập nhật thôi
+                status, value = device_model.update_one(
+                    {
+                        device_model.ACCOUNT_ID: ac_value[account_model._ID],
+                        device_model.DEVICES + "." + device_model.INFOR + "." + device_model.IMEI: imei,
+                        device_model.DEVICES + "." + device_model.INFOR + "." + device_model.DEVICE_NAME: device_name
+                    },
+                    {
+                        '$set': {
+                            device_model.DEVICES + ".$." + device_model.PRIVILEGE: device_model.PRIVILEGE_UNKNOWN,
+                            device_model.DEVICES + ".$." + device_model.TOKEN: token,
+                            device_model.DEVICES + ".$." + device_model.STATUS: device_model.STATUS_LOGIN
+                        }
+                    })
+                db_mongo.close_db()
+                if not status:
+                    return utils.notfiy_db_error()
+
+            else:
+                # Nếu thiết bị chưa được đăng nhập lần nào
+                # THêm thiết bị vào màng devices trong db
+                status, value = device_model.insert_one({
+                    device_model.ACCOUNT_ID: ac_value[account_model._ID],
+                    device_model.DEVICES: {
+                        device_model.INFOR: {
+                            device_model.IMEI: imei,
+                            device_model.DEVICE_NAME: device_name
+                        },
+                        device_model.PRIVILEGE: {
+                            device_model.PRIVILEGE_TYPE: device_model.PRIVILEGE_UNKNOWN
+                        },
+                        device_model.TOKEN: token,
+                        device_model.STATUS: device_model.STATUS_LOGIN,
+                    }
+                })
+                db_mongo.close_db()
+                if not status:
+                    return utils.notfiy_db_error()
+            # Gửi về status và token.
+            # Nếu cập nhật không thành công
+            # if not status:
+            return {"status": "1", "token": token}
+
+        else:  # Thông báo user hoặc mật khẩu không đúng
+            db_mongo.close_db()
+            return {"status": "0", "msg": "error_1"}
+
+
+class ParentAccountApi(Resource):
+    def post(self):
+        """
+        Thực hiện đăng ký tài khoản
+        :return:
+        { "status": True|False, "msg":"error_id"}
+        error_1: Tài khoản đã tồn tại
+        error_0: Đã có lỗi xảy ra
+        """
+        email = request.values['email']
+        password = request.values['password']
+        full_name = request.values['full_name']
+
+        db_mongo = DbMongo()
+        db_mongo.connect_db()
+        account_model = AccountModel(db_mongo.db)
+        # Tìm trong db
+        status, value = account_model.find_one(
+            spec={
+                account_model.PARENT + "." + account_model.EMAIL: email,
+            },
+            fields={account_model._ID: 1})
+
+        if not status:
+            db_mongo.close_db()
+            return utils.notfiy_db_error()
+
+        if value is not None and len(value) > 0:
+            # Nếu email đã tồn tại
+            db_mongo.close_db()
+            return {"status": "0", "msg": "error_1"}
+        else:
+            # Nếu email chưa tồn tại, thêm vào csdl
+            status, value = account_model.insert_one({
+                account_model.PARENT: {
+                    account_model.PROFILE_ID: ObjectId(),
+                    account_model.EMAIL: email,
+                    account_model.PASSWORD: password,
+                    account_model.FULL_NAME: full_name
+                }
+            })
+            db_mongo.close_db()
+            if not status:
+                return utils.notfiy_db_error()
+            return {"status": "1"}
+
+
+class ChildAccountApi(Resource):
+    def post(self):
+        """
+        Thêm thiết bị trẻ con
+        :return:
+        {"status":"0|1", "msg":"error_id"}
+        error_3: Yêu cầu đăng nhập lại, token,device_name, imei không hợp lệ
+        error_1: Child này đã tồn tại.
+        """
+        token = request.values['token']
+        imei = request.values['imei']
+        device_name = request.values['device_name']
+        db_mongo = DbMongo()
+        db_mongo.connect_db()
+        account_model = AccountModel(db_mongo.db)
+        device_model = AccountModel(db_mongo.db)
+
+        status, value = account_model.auth_token(token, imei, device_name)
+
+        if not status:
+            utils.notfiy_db_error()
+
+        if status:
+            full_name = request.values['full_name']
+            birth = request.values['birth']
+            exist = False
+
+            for child in value[account_model.PROFILES][account_model.CHILD]:
+                if child[account_model.FULL_NAME] == full_name:
+                    exist = True
+                    break
+            if exist:
+                # Nếu tên trẻ con này tồn tại
+                return {"status": "0", "msg": "error_1"}
+            else:
+                # Đảm bảo ObjectId không bị trùng
+                while True:
+                    profile_tmp = ObjectId()
+                    for child in value[account_model.PROFILES][account_model.CHILD]:
+                        print child
+
+                        print str(profile_tmp)
+                        if child[account_model.PROFILE_ID] == profile_tmp:
+                            continue
+                    break
+
+                # Nếu child chưa tồn tại, thêm vào db
+                status, value = account_model.update_one(
+                    {
+                        account_model.DEVICES + "." + account_model.INFOR + "." + account_model.IMEI: imei,
+                        account_model.DEVICES + "." + account_model.INFOR + "." + account_model.DEVICE_NAME: device_name,
+                        account_model.DEVICES + "." + account_model.TOKEN: token,
+                    },
+                    {
+                        "$addToSet": {
+                            account_model.PROFILES + "." + account_model.CHILD: {
+                                account_model.PROFILE_ID: profile_tmp,
+                                account_model.FULL_NAME: full_name,
+                                account_model.BIRTH: birth
+                            }
+                        }
+                    }
+                )
+                if not status:
+                    return {"status": "0", "msg": "error_0"}
+                return {"status": "1"}
+
+
+class SmsApi(Resource):
+    def post(self):
+        """
+        Theem tin nhan vao db
+        :return:
+        """
+        token = request.values['token']
+        imei = request.values['imei']
+        device_name = request.values['device_name']
+        db_mongo = DbMongo()
+        db_mongo.connect_db()
+        device_model = DeviceModel(db_mongo.db)
+        dev_status, dev_value = device_model.is_logged_in(token, imei, device_name)
+        if not dev_status:
+            db_mongo.close_db()
+            utils.notfiy_db_error()
+        if dev_value is not None and len(dev_value) > 0:
+            # Nếu đã được đăng nhập
+            # cover json thành mangr
+            data = request.values['data']
+            json_smses = json.loads(data)
+            array_sms = []
+            for json_sms in json_smses:
+                dict_sms = {}
+                for attribute, value in json_sms.iteritems():
+                    dict_sms[attribute] = value
+                array_sms.append(dict_sms)
+
+            sms_model = SmsModel(db_mongo.db)
+            status, value = sms_model.update_many(
+                {
+                    sms_model.DEVICE_ID: dev_value[device_model.ACCOUNT_ID]
+                },
+                {
+                    "$push": {
+                        sms_model.DATA: array_sms
+                    }
+                }
+            )
+            if not status:
+                utils.notfiy_db_error()
+            return {"status": "1"}
+
+        else:
+            db_mongo.close_db()
+            # trả về là auth này chưa được đăng nhập
+            # => Dưới android hãy chuyển trạng thái phần mềm sang off
+            return {"status": "0", "msg": "error_0"}
