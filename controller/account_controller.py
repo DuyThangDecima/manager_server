@@ -3,7 +3,7 @@
 
 from db.db import DbMongo
 from flask import session, redirect, render_template
-from model.account_model import AccountModel
+from model.model_db import AccountModel
 
 
 class AccountController():
@@ -12,7 +12,7 @@ class AccountController():
         self.model = AccountModel(self.db_mongo.db)
         pass
 
-    def login(self, username, password):
+    def login(self, email, password):
         """
         Người dùng ấn đăng nhập
         :param username:
@@ -20,7 +20,7 @@ class AccountController():
         :return:
         """
         self.db_mongo.connect_db();
-        status, value = self.model.login(username, password)
+        status, value = self.model.find_one(spec={AccountModel.EMAIL: email, AccountModel.PASSWORD: password})
         self.db_mongo.close_db()
 
         if status:

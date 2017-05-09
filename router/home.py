@@ -24,7 +24,17 @@ def register_urls(app):
                 return render_template("dashboard/main.html", msg=msg)
         return render_template("home/index.html")
 
-    @app.route('/login', methods=['POST', 'GET'])
+
+    @app.route('/login_form', methods=['POST','GET'])
+    def login_form():
+        """
+        Người dùng ấn đăng nhập
+        :return:
+        """
+        print "thangld_xxxx"
+        return render_template("home/login.html")
+
+    @app.route('/login', methods=['POST'])
     def login():
         """
         Người dùng ấn đăng nhập

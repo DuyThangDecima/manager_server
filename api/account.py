@@ -7,8 +7,6 @@ from flask_restful import Resource
 from model.account_model import AccountModel
 
 
-
-
 class ParentApi(Resource):
     def post(self):
         """
@@ -16,6 +14,7 @@ class ParentApi(Resource):
         :return:
         { "status": True|False, "msg":"error_id"}
         """
+
         email = request.values['email']
         password = request.values['password']
         full_name = request.values['full_name']
@@ -57,6 +56,7 @@ class ParentApi(Resource):
             db_mongo.close_db()
             return {"status": "0", "msg": "error_0"}
 
+
 class ChildApi(Resource):
     def post(self):
         """
@@ -68,7 +68,6 @@ class ChildApi(Resource):
         device_name = request.values['device_name']
         token = request.values['token']
 
-
         full_name = request.values['full_name']
         age = request.values['age']
 
@@ -78,15 +77,15 @@ class ChildApi(Resource):
         # Tìm trong db
         status, value = model_account.find_one(
             spec={
-                model_account.DEVICES + "." + model_account.IMEI:imei,
-                model_account.DEVICES + "." + model_account.DEVICES:device_name,
-                model_account.DEVICES + "." + model_account.TOKEN:token,
+                model_account.DEVICES + "." + model_account.IMEI: imei,
+                model_account.DEVICES + "." + model_account.DEVICES: device_name,
+                model_account.DEVICES + "." + model_account.TOKEN: token,
             },
             fields={model_account._ID: 1})
 
         if status:
             if value is not None and len(value) > 0:
-                # Nếu email đã tồn tại
+                # Nếu
                 db_mongo.close_db()
                 return {"status": "0", "msg": "error_1"}
             else:
@@ -110,3 +109,5 @@ class ChildApi(Resource):
         else:  # Đã có lỗi xảy ra
             db_mongo.close_db()
             return {"status": "0", "msg": "error_0"}
+
+
