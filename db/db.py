@@ -5,21 +5,48 @@ from config import *
 from model.model_db import AccountModel
 from pymongo import MongoClient
 
+try:
+    # Python 3.x
+    from urllib.parse import quote_plus
+except ImportError:
+    # Python 2.x
+    from urllib import quote_plus
+
 
 class DbMongo:
+    db = None
+    client = None
+
     def __init__(self):
         try:
-            self.client = MongoClient(DB_IP["ip"], DB_IP["port"])
-            self.db = self.client[DB_NAME]
+            # self.client = MongoClient("35.184.69.50", 27017)
+            # print "DB_NAME:" + DB_NAME
+            # self.db = self.client[DB_NAME]
+            # print "self.db: " + str(self.db)
+            # test_db = self.client.test
+            # data = test_db['account'].find({})
+
+            uri = "mongodb://%s:%s@%s" % (
+                quote_plus("thangld_1202_user"), quote_plus("QAZwsx*098#pl,"), "35.184.69.50:27017")
+
+            client = MongoClient(uri)
+            db = client.test
+            data = db['account'].find({})
+            for item in data:
+                print item
+            for item in data:
+                print item
+
         except Exception as e:
             logging.error("Fail to connect db" + str(e))
 
     def connect_db(self):
-        try:
-            self.db.authenticate(DB_ACCOUNT["user"], DB_ACCOUNT["password"], mechanism='SCRAM-SHA-1')
-        except Exception as e:
-            logging.error("auth db fail " + str(e))
         return
+        # try:
+            # self.db.authenticate(DB_ACCOUNT["user"], DB_ACCOUNT["password"], mechanism='SCRAM-SHA-1')
+        # except Exception as e:
+        #     logging.error("auth db fail " + str(e))
+        # return
 
     def close_db(self):
         """

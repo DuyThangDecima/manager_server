@@ -36,3 +36,8 @@ handlers:
 #libraries:
 #- name: jinja2
 #  version: latest
+
+#[START env]
+env_variables:
+    CLOUD_STORAGE_BUCKET: /kubernetes-codelab-1378.appspot.com
+#[END env]

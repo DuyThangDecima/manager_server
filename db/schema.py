@@ -7,12 +7,52 @@ import config
 from bson import ObjectId
 from model.model_db import AccountModel
 from pymongo import MongoClient
+from pymongo.errors import ConnectionFailure
+from pymongo import ReadPreference
+
+# 35.184.69.50:27017
+# uri = "mongodb://%s:%s@%s" % (
+#     quote_plus("thangld_1202_user"), quote_plus("QAZwsx*098#pl,"), '127.0.0.1:27017')
+# try:
+#     client = MongoClient("127.0.0.1",27017)
+# except Exception as e:
+#     print "client connect " + e.message
+
+# try:
+#     # The ismaster command is cheap and does not require auth.
+#     client.admin.command('ismaster')
+# except ConnectionFailure:
+#     print("Server not available")
+
+client = MongoClient("127.0.0.1",27017)
+db = client.test
+data = db.account.find({})
+for item in data:
+    print item
 
 try:
-    # client = MongoClient('104.155.136.47', 27017)
-    client = MongoClient('127.0.0.1', 27017)
-except Exception as e:
-    print "client connect " + e.message
+    # The ismaster command is cheap and does not require auth.
+    db = client.get_database('test')
+    # client.admin.command('ismaster')
+except ConnectionFailure:
+    print("Server not available")
+
+# print "start"
+# try:
+#     # client = MongoClient('104.155.136.47', 27017)
+#     # replicaSet = "rs0"
+#     # 35.184.122.206, 35.184.69.50
+#     client = MongoClient('35.184.69.50', 27017)
+# except Exception as e:
+#     print "client connect " + e.message
+
+
+    # db = client[config.DB_NAME]
+    # db.authenticate("thangld_1202_user","QAZwsx*098#pl,")
+data = db.test.account.find({})
+
+for item in data:
+    print item
 
 
 def refresh_db():
@@ -101,122 +141,71 @@ def main():
     insert_account(db)
 
 
-# main()
+    # main()
 
-# version_client = "1.0.10.0"
-# sorted(ids)
-#
-db = client[config.DB_NAME];
-value = db['device'].find(
-    {
-        'account_id': ObjectId("58ff7d964bf65a18193a12b8"),
-        "devices.token": "b00049a39507f32ce28abfc10da0eae6"
-    },
-    {
-        'devices': {'$elemMatch': {'token': "b00049a39507f32ce28abfc10da0eae6"}}
-    }
-
-)
-# call_log_array = value['devices']
-
-for item in value:
-    data=  item
-
-print value
-
-# call_log_array.sort(key=lambda k: str(k["_id"]), reverse=False)
-#
-#
-# index_client = 0
-# size_client = len(ids)
-# index_server = 0
-# size_server = len(call_log_array);
-# result_action = []
-# while index_client < size_client and index_server < size_server:
-#     item = call_log_array[index_server];
-#     id_server = str(item["_id"])
-#     id_client = ids[index_client];
-#     if id_client == id_server:
-#         if version_client != item["version"]:
-#             item["action"] = "update"
-#             result_action.append(item)
-#         else:
-#             """Trong truong hop giong nhau thi ko can action gi ca"""
-#         index_client += 1
-#         index_server += 1
-#     elif id_client < id_server:
-#         item["action"] = "delete"
-#         index_client += 1
-#         result_action.append({"action": "delete", "_id": id_client})
-#     elif id_client > id_server:
-#         item["action"] = "add"
-#         index_server += 1
-#         result_action.append(item)
-#
-# while index_client < size_client:
-#     result_action.append({"_id": ids[index_client], "action": "delete"})
-#     index_client += 1
-#
-# while index_server < size_server:
-#     item = call_log_array[index_server];
-#     item["action"] = "add"
-#     result_action.append(item)
-#     index_server += 1
-#
-# for item in result_action:
-#     print str(item["_id"]) + "---" + item["action"]
+    # version_client = "1.0.10.0"
+    # sorted(ids)
+    #
 
 
-
-class VideoDownload(FileDownload):
-    def post(self, *args, **kwargs):
-        return super(VideoDownload, self).post(*args, **kwargs)
-
-    def check_file_id(self, db_mongo, device_id, child_id, file_id):
-        super(VideoDownload, self).check_file_id(db_mongo, device_id, child_id, file_id)
-
-        media_model = MediaModel(db_mongo.db);
-        status_check, value_check = media_model.find_one(
-            spec={
-                MediaModel.DEVICE_ID: device_id,
-                MediaModel.CHILD_ID: child_id,
-                MediaModel.VIDEO + "." + MediaModel._ID: ObjectId(file_id)
-            },
-            fields={
-                MediaModel.VIDEO: {'$elemMatch': {MediaModel._ID: ObjectId(file_id)}}
-            }
-        )
-        if status_check:
-            if value_check is not None and len(value_check) > 0:
-                return True, value_check[MediaModel.VIDEO][0]
-            else:
-                return False, None
-        else:
-            return False, None
-
-class AudioDownload(FileDownload):
-    def post(self, *args, **kwargs):
-        return super(AudioDownload, self).post(*args, **kwargs)
-
-    def check_file_id(self, db_mongo, device_id, child_id, file_id):
-        super(AudioDownload, self).check_file_id(db_mongo, device_id, child_id, file_id)
-
-        media_model = MediaModel(db_mongo.db);
-        status_check, value_check = media_model.find_one(
-            spec={
-                MediaModel.DEVICE_ID: device_id,
-                MediaModel.CHILD_ID: child_id,
-                MediaModel.AUDIO + "." + MediaModel._ID: ObjectId(file_id)
-            },
-            fields={
-                MediaModel.AUDIO: {'$elemMatch': {MediaModel._ID: ObjectId(file_id)}}
-            }
-        )
-        if status_check:
-            if value_check is not None and len(value_check) > 0:
-                return True, value_check[MediaModel.AUDIO][0]
-            else:
-                return False, None
-        else:
-            return False, None
-
+    # value = db['device'].find(
+    #     {
+    #         'account_id': ObjectId("58ff7d964bf65a18193a12b8"),
+    #         "devices.token": "b00049a39507f32ce28abfc10da0eae6"
+    #     },
+    #     {
+    #         'devices': {'$elemMatch': {'token': "b00049a39507f32ce28abfc10da0eae6"}}
+    #     }
+    #
+    # )
+    # # call_log_array = value['devices']
+    #
+    # for item in value:
+    #     data=  item
+    #
+    # print value
+    #
+    # # call_log_array.sort(key=lambda k: str(k["_id"]), reverse=False)
+    # #
+    # #
+    # # index_client = 0
+    # # size_client = len(ids)
+    # # index_server = 0
+    # # size_server = len(call_log_array);
+    # # result_action = []
+    # # while index_client < size_client and index_server < size_server:
+    # #     item = call_log_array[index_server];
+    # #     id_server = str(item["_id"])
+    # #     id_client = ids[index_client];
+    # #     if id_client == id_server:
+    # #         if version_client != item["version"]:
+    # #             item["action"] = "update"
+    # #             result_action.append(item)
+    # #         else:
+    # #             """Trong truong hop giong nhau thi ko can action gi ca"""
+    # #         index_client += 1
+    # #         index_server += 1
+    # #     elif id_client < id_server:
+    # #         item["action"] = "delete"
+    # #         index_client += 1
+    # #         result_action.append({"action": "delete", "_id": id_client})
+    # #     elif id_client > id_server:
+    # #         item["action"] = "add"
+    # #         index_server += 1
+    # #         result_action.append(item)
+    # #
+    # # while index_client < size_client:
+    # #     result_action.append({"_id": ids[index_client], "action": "delete"})
+    # #     index_client += 1
+    # #
+    # # while index_server < size_server:
+    # #     item = call_log_array[index_server];
+    # #     item["action"] = "add"
+    # #     result_action.append(item)
+    # #     index_server += 1
+    # #
+    # # for item in result_action:
+    # #     print str(item["_id"]) + "---" + item["action"]
+    #
+    #
+    # print client.database_names

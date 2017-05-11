@@ -1,8 +1,6 @@
 # -*- coding: utf-8 -*-
 from functools import wraps
 
-from werkzeug import utils
-
 __author__ = 'ThangLD'
 import abc
 
@@ -12,7 +10,8 @@ from flask import request, send_file
 from flask_restful import abort, Resource
 from model.model_db import *
 from utils import *
-import os
+from werkzeug.utils import secure_filename
+from googlecloudstore import *
 
 
 def abort_if_json_request_invalid(request_json, param_keys):
@@ -177,11 +176,13 @@ class AuthenticationApi(Resource):
 
         db_mongo = DbMongo()
         db_mongo.connect_db()
+        print db_mongo.db
         device_model = DeviceModel(db_mongo.db)
         account_model = AccountModel(db_mongo.db)
         # Tìm trong db
         ac_status, ac_value = account_model.auth(email, password)
         if not ac_status:
+            print str(ac_value)
             db_mongo.close_db()
             return notification.notify_error_db()
 
@@ -1612,6 +1613,7 @@ class ImageApi(MediaApi):
                 media_model.IMAGE: {'$elemMatch': {media_model._ID: ObjectId(file_id)}}
             }
         )
+
         data_retrive = None
         for item in im_value:
             data_retrive = item;
@@ -1620,10 +1622,11 @@ class ImageApi(MediaApi):
             return notification.notify_error_db()
         data = data_retrive[media_model.IMAGE][0][media_model.IMAGE_FIELDS["DATA"]]
         display_name = data_retrive[media_model.IMAGE][0][media_model.IMAGE_FIELDS["DISPLAY_NAME"]]
+        id = data_retrive[media_model.IMAGE][0][media_model._ID]
 
         # check file exist
 
-        display_name = utils.secure_filename(display_name)
+        display_name = secure_filename(display_name)
 
         if os.path.exists(os.path.join(data, display_name)):
             if display_name.rfind('.') != -1:
@@ -1639,11 +1642,14 @@ class ImageApi(MediaApi):
                 i += 1
 
         # Chuyển trạng thái của file trong image
-        content = request.files['file']
-        if not os.path.exists(data):
-            os.makedirs(data)
+        content = request.files['file'].read()
+        CloudStorageManager().create_file(data + "/" + id, content)
 
-        content.save(data + "/" + display_name)
+        # XXX : Thay the dung google cloud storage
+        # if not os.path.exists(data):
+        #     os.makedirs(data)
+        #
+        # content.save(data + "/" + display_name)
         # Cap nhat thong tin
         media_model.update_one(
             {
@@ -1694,10 +1700,11 @@ class AudioApi(MediaApi):
             return notification.notify_error_db()
         data = data_retrive[media_model.AUDIO][0][media_model.AUDIO_FIELDS["DATA"]]
         display_name = data_retrive[media_model.AUDIO][0][media_model.AUDIO_FIELDS["DISPLAY_NAME"]]
+        id = data_retrive[media_model.AUDIO][0][media_model._ID]
 
         # check file exist
         i = 1;
-        display_name = utils.secure_filename(display_name)
+        display_name = secure_filename(display_name)
         while os.path.exists(os.path.join(data, display_name)):
 
             if display_name.rfind('.') != -1:
@@ -1713,11 +1720,15 @@ class AudioApi(MediaApi):
 
         # Chuyển trạng thái của file trong image
 
-        content = request.files['file']
-        if not os.path.exists(data):
-            os.makedirs(data)
+        # content = request.files['file']
+        # if not os.path.exists(data):
+        #     os.makedirs(data)
+        #
+        # content.save(data + "/" + display_name)
 
-        content.save(data + "/" + display_name)
+        content = request.files['file'].read()
+        CloudStorageManager().create_file(data + "/" + id, content)
+
         # Cap nhat thong tin
         media_model.update_one(
             {
@@ -1769,10 +1780,11 @@ class VideoApi(MediaApi):
             return notification.notify_error_db()
         data = data_retrive[media_model.VIDEO][0][media_model.VIDEO_FIELDS["DATA"]]
         display_name = data_retrive[media_model.VIDEO][0][media_model.VIDEO_FIELDS["DISPLAY_NAME"]]
+        display_name = data_retrive[media_model.VIDEO][0][media_model._ID]
 
         # check file exist
         i = 1;
-        display_name = utils.secure_filename(display_name)
+        display_name = secure_filename(display_name)
         while os.path.exists(os.path.join(data, display_name)):
 
             if display_name.rfind('.') != -1:
@@ -1788,11 +1800,15 @@ class VideoApi(MediaApi):
 
         # Chuyển trạng thái của file trong video
 
-        content = request.files['file']
-        if not os.path.exists(data):
-            os.makedirs(data)
+        # content = request.files['file']
+        # if not os.path.exists(data):
+        #     os.makedirs(data)
+        #
+        # content.save(data + "/" + display_name)
 
-        content.save(data + "/" + display_name)
+        content = request.files['file'].read()
+        CloudStorageManager().create_file(data + "/" + id, content)
+
         # Cap nhat thong tin
         media_model.update_one(
             {
@@ -2207,7 +2223,8 @@ class FileDownload(Resource):
         if status:
             data = record[MediaModel.IMAGE_FIELDS["DATA"]];
             display_name = record[MediaModel.IMAGE_FIELDS["DISPLAY_NAME"]];
-            file_path = data + "/" + display_name
+            id_record = record[MediaModel._ID];
+            file_path = data + "/" + id_record
             return send_file(file_path)
         else:
             abort(400)
@@ -2503,8 +2520,8 @@ def register_extra(app):
         lat_location = json_data[notification.PARAMS["lat_location"]]
         long_location = json_data[notification.PARAMS["long_location"]]
         device_id = json_data[notification.PARAMS["device_id"]]
-        print "device_id receive" + device_id ;
-        status,value = device_model.find_one(
+        print "device_id receive" + device_id;
+        status, value = device_model.find_one(
             spec={
                 DeviceModel.ACCOUNT_ID: dev_value[DeviceModel.ACCOUNT_ID]
             },
@@ -2515,9 +2532,33 @@ def register_extra(app):
         token_fcm = value[DeviceModel.DEVICES][0][DeviceModel.TOKEN_FCM]
         print "token_fcm to respond" + token_fcm
 
-        respond = FCMRequest().send_respond_location(token_fcm,lat_location,long_location)
+        respond = FCMRequest().send_respond_location(token_fcm, lat_location, long_location)
         print respond
 
         print str(lat_location) + "," + str(long_location)
         db_mongo.close_db()
         return jsonify(status=1)
+
+    # ---------------------------------------------------
+    # --------------                      ---------------
+    # ------------   GOOGLE CLOUD STORE TEST  ---------------
+    # -------------                       ---------------
+    # ---------------------------------------------------
+
+
+    @app.route(api_version1 + '/save_file', methods=["POST", "PUT"])
+    def save_file():
+        data = request.form['data']
+        print data
+
+        content = request.files['file'].read()
+        print content
+        print "receive_finish"
+        CloudStorageManager().create_file_content("/app_default_bucket/th", content)
+        return jsonify(status=1)
+
+    @app.route(api_version1 + '/send_file', methods=["POST", "PUT"])
+    def send_file():
+        content = CloudStorageManager().read_file("/app_default_bucket/th")
+        print content
+        return content;
