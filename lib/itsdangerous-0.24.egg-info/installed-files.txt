@@ -2,7 +2,7 @@
 ../itsdangerous.pyc
 ./
 not-zip-safe
+PKG-INFO
+top_level.txt
 SOURCES.txt
 dependency_links.txt
-top_level.txt
-PKG-INFO

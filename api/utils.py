@@ -1,5 +1,11 @@
+# -*- coding: utf-8 -*-
+
 import json
-import requests
+
+import logging
+from google.appengine.api import urlfetch
+
+# import requests
 
 import config
 from bson import ObjectId
@@ -13,9 +19,27 @@ class JSONEncoder(json.JSONEncoder):
         return json.JSONEncoder.default(self, o)
 
 
+# START SEND_POST_SSL
+def send_post_ssl(url, method, headers, content):
+    try:
+        result = urlfetch.fetch(
+            url=url,
+            method=method,
+            payload=content,
+            headers=headers,
+            validate_certificate=True
+        )
+        return result
+    except urlfetch.Error as e:
+        logging.exception('Caught exception fetching url')
+        return e.message
+
+
+# END SEND_POST_SSL
+
 class FCMRequest():
     def send_request_location(self, to, device_id):
-        url = 'https://fcm.googleapis.com/fcm/send'
+        url_fcm_send = 'https://fcm.googleapis.com/fcm/send'
         body = {
             "data": {
                 "type_request": FCM_TYPE["request_location"],
@@ -26,11 +50,13 @@ class FCMRequest():
 
         headers = {"Content-Type": "application/json",
                    "Authorization": "key=" + config.KEY_FCM_SERVER}
-        respond = requests.post(url, data=json.dumps(body), headers=headers)
+        # GOOGLE_APP_ENGINE: Dùng send_post_ssl để thay request.post
+        respond = send_post_ssl(url_fcm_send, urlfetch.POST, headers, json.dumps(body))
+        # respond = requests.post(url, data=json.dumps(body), headers=headers)
         return respond;
 
     def send_respond_location(self, to, lat_location, long_location):
-        url = 'https://fcm.googleapis.com/fcm/send'
+        url_fcm_send = 'https://fcm.googleapis.com/fcm/send'
         body = {
             "data": {
                 "type_request": FCM_TYPE["respond_location"],
@@ -42,5 +68,8 @@ class FCMRequest():
 
         headers = {"Content-Type": "application/json",
                    "Authorization": "key=" + config.KEY_FCM_SERVER}
-        respond = requests.post(url, data=json.dumps(body), headers=headers)
+
+        # GOOGLE_APP_ENGINE: Dùng send_post_ssl để thay request.post
+        respond = send_post_ssl(url_fcm_send, urlfetch.POST, headers, json.dumps(body))
+        # respond = requests.post(url, data=json.dumps(body), headers=headers)
         return respond;

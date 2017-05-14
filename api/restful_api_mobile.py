@@ -1,18 +1,18 @@
 # -*- coding: utf-8 -*-
 from functools import wraps
+from flask.helpers import make_response
 
 __author__ = 'ThangLD'
 import abc
 
 import notification
 from db.db import DbMongo, Version
-from flask import request, send_file
+from flask import request, send_file, Blueprint
 from flask_restful import abort, Resource
 from model.model_db import *
 from utils import *
 from werkzeug.utils import secure_filename
 from googlecloudstore import *
-
 
 def abort_if_json_request_invalid(request_json, param_keys):
     if not request_json.json:
@@ -176,14 +176,15 @@ class AuthenticationApi(Resource):
 
         db_mongo = DbMongo()
         db_mongo.connect_db()
-        print db_mongo.db
+        # print db_mongo.db
+
         device_model = DeviceModel(db_mongo.db)
         account_model = AccountModel(db_mongo.db)
+
         # Tìm trong db
         ac_status, ac_value = account_model.auth(email, password)
         if not ac_status:
             print str(ac_value)
-            db_mongo.close_db()
             return notification.notify_error_db()
 
         if ac_value is not None and len(ac_value) > 0:
@@ -197,7 +198,6 @@ class AuthenticationApi(Resource):
             )
             if not dev_status:
                 # query db mà lỗi là trả về lỗi luôn
-                db_mongo.close_db()
                 return notification.notify_error_db()
 
             token = device_model.generate_token()
@@ -299,14 +299,12 @@ class AuthenticationApi(Resource):
                                 }
                             }
                         )
-                db_mongo.close_db()
             if not status_final:
                 return notification.notify_error_db()
                 # Gửi về status và token.
                 # Nếu cập nhật không thành công
             return jsonify(status=1, token=token)
         else:  # Thông báo user hoặc mật khẩu không đúng
-            db_mongo.close_db()
             return notify_error_auth()
 
 
@@ -393,6 +391,7 @@ class ChildAccountApi(Resource):
         if ac_value is not None and len(ac_value) > 0:
             return notification.notify_error_exist()
         else:
+            object_id = ObjectId()
             # Nếu child chưa tồn tại, thêm vào db
             status, value = account_model.update_one(
                 {
@@ -401,7 +400,7 @@ class ChildAccountApi(Resource):
                 {
                     "$addToSet": {
                         account_model.CHILD: {
-                            account_model._ID: ObjectId(),
+                            account_model._ID: object_id,
                             account_model.FULL_NAME: full_name,
                             account_model.BIRTH: birth
                         }
@@ -410,7 +409,7 @@ class ChildAccountApi(Resource):
             )
             if not status:
                 return notification.notify_error_db()
-            return jsonify(status=1);
+            return jsonify(status=1,child_id=str(object_id),full_name=full_name,birth=birth);
 
     @require_api_key
     def get(self, **kwargs):
@@ -503,6 +502,22 @@ class ChildAccountApi(Resource):
                 }
             )
         return notification.notify_update_successfully()
+
+    @require_api_key
+    def delete(self,**kwargs):
+        """
+        TODO
+        Bo me xoa tre con
+        :param kwargs: 
+        :return: 
+        """
+        db_mongo = kwargs['db_mongo']
+        dev_value = kwargs['dev_value']
+        device_model = kwargs['device_model']
+        json_data = kwargs['json_data']
+        child_id = json_data.values[notification.PARAMS["child_id"]]
+        # Xoa trong csdl
+        return
 
 
 class JsonResourceApi(Resource):
@@ -1622,7 +1637,7 @@ class ImageApi(MediaApi):
             return notification.notify_error_db()
         data = data_retrive[media_model.IMAGE][0][media_model.IMAGE_FIELDS["DATA"]]
         display_name = data_retrive[media_model.IMAGE][0][media_model.IMAGE_FIELDS["DISPLAY_NAME"]]
-        id = data_retrive[media_model.IMAGE][0][media_model._ID]
+        id = str(data_retrive[media_model.IMAGE][0][media_model._ID])
 
         # check file exist
 
@@ -1700,7 +1715,7 @@ class AudioApi(MediaApi):
             return notification.notify_error_db()
         data = data_retrive[media_model.AUDIO][0][media_model.AUDIO_FIELDS["DATA"]]
         display_name = data_retrive[media_model.AUDIO][0][media_model.AUDIO_FIELDS["DISPLAY_NAME"]]
-        id = data_retrive[media_model.AUDIO][0][media_model._ID]
+        id = str(data_retrive[media_model.AUDIO][0][media_model._ID])
 
         # check file exist
         i = 1;
@@ -1780,7 +1795,7 @@ class VideoApi(MediaApi):
             return notification.notify_error_db()
         data = data_retrive[media_model.VIDEO][0][media_model.VIDEO_FIELDS["DATA"]]
         display_name = data_retrive[media_model.VIDEO][0][media_model.VIDEO_FIELDS["DISPLAY_NAME"]]
-        display_name = data_retrive[media_model.VIDEO][0][media_model._ID]
+        id = str(data_retrive[media_model.VIDEO][0][media_model._ID])
 
         # check file exist
         i = 1;
@@ -2223,9 +2238,15 @@ class FileDownload(Resource):
         if status:
             data = record[MediaModel.IMAGE_FIELDS["DATA"]];
             display_name = record[MediaModel.IMAGE_FIELDS["DISPLAY_NAME"]];
-            id_record = record[MediaModel._ID];
-            file_path = data + "/" + id_record
-            return send_file(file_path)
+            id_record = str(record[MediaModel._ID]);
+            path_download = data + "/" + id_record
+            # GOOGLE_APP_ENGINE
+            print "path_download" + path_download;
+            content = CloudStorageManager().read_file(path_download)
+            print content
+            respond = make_response(content)
+            return respond
+            # return send_file(file_path)
         else:
             abort(400)
 

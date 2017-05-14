@@ -19,6 +19,16 @@ class DbMongo:
 
     def __init__(self):
         try:
+            uri = "mongodb://%s:%s@%s" % (
+                quote_plus("thangld_1202_user"), quote_plus("QAZwsx*098#pl,"), "35.184.69.50:27017")
+            self.client = MongoClient(uri)
+            self.db = self.client[DB_NAME]
+
+            # client = MongoClient("35.184.69.50", 27017)
+            # db = client.test
+            # data = db['account'].find({})
+            # for item in data:
+            #     print item;
             # self.client = MongoClient("35.184.69.50", 27017)
             # print "DB_NAME:" + DB_NAME
             # self.db = self.client[DB_NAME]
@@ -26,16 +36,17 @@ class DbMongo:
             # test_db = self.client.test
             # data = test_db['account'].find({})
 
-            uri = "mongodb://%s:%s@%s" % (
-                quote_plus("thangld_1202_user"), quote_plus("QAZwsx*098#pl,"), "35.184.69.50:27017")
-
-            client = MongoClient(uri)
-            db = client.test
-            data = db['account'].find({})
-            for item in data:
-                print item
-            for item in data:
-                print item
+            #
+            # uri = "mongodb://%s:%s@%s" % (
+            #     quote_plus("thangld_1202_user"), quote_plus("QAZwsx*098#pl,"), "35.184.69.50:27017")
+            #
+            # client = MongoClient(uri)
+            # db = client.test
+            # data = db['account'].find({})
+            # for item in data:
+            #     print item
+            # for item in data:
+            #     print item
 
         except Exception as e:
             logging.error("Fail to connect db" + str(e))
