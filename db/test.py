@@ -21,3 +21,5 @@ db = client.test
 data = db['account'].find({})
 for item in data:
     print item
+
+

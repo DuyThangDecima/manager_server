@@ -23,7 +23,7 @@ from api.restful_api_mobile import VideoApi
 from api.restful_api_mobile import AudioApi
 from api.restful_api_mobile import VersionApi
 from api.restful_api_mobile import VideoNeedDownload
-from api.restful_api_mobile import CallLogApi
+from api.restful_api_mobile import CallLogApi, AppDownloader
 import config
 
 
@@ -60,7 +60,7 @@ def add_resources(api_flask):
     api_flask.add_resource(VideoApi, api_version1 + '/video/<file_id>')
     api_flask.add_resource(VideoListApi, api_version1 + '/video')
 
-    # Image
+    # Audio
     api_flask.add_resource(AudioApi, api_version1 + '/audio/<file_id>')
     api_flask.add_resource(AudioListApi, api_version1 + '/audio')
 
@@ -74,7 +74,9 @@ def add_resources(api_flask):
 
     api_flask.add_resource(SmsDownloader, api_version1 + '/download/sms')
     api_flask.add_resource(CallLogDownloader, api_version1 + '/download/calllog')
+    api_flask.add_resource(AppDownloader, api_version1 + '/download/app')
 
     api_flask.add_resource(ImageDownload, api_version1 + '/download/image')
     api_flask.add_resource(VideoDownload, api_version1 + '/download/video')
     api_flask.add_resource(AudioDownload, api_version1 + '/download/audio')
+

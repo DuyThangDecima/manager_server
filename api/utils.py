@@ -73,3 +73,20 @@ class FCMRequest():
         respond = send_post_ssl(url_fcm_send, urlfetch.POST, headers, json.dumps(body))
         # respond = requests.post(url, data=json.dumps(body), headers=headers)
         return respond;
+
+    def send_request_download_rule_parent(self, to):
+        print "send_request_download_rule_parent to " + to
+        url_fcm_send = 'https://fcm.googleapis.com/fcm/send'
+        body = {
+            "data": {
+                "type_request": FCM_TYPE["request_update_rule_parent"],
+            },
+            "to": to
+        }
+
+        headers = {"Content-Type": "application/json",
+                   "Authorization": "key=" + config.KEY_FCM_SERVER}
+        # GOOGLE_APP_ENGINE: Dùng send_post_ssl để thay request.post
+        respond = send_post_ssl(url_fcm_send, urlfetch.POST, headers, json.dumps(body))
+        # respond = requests.post(url, data=json.dumps(body), headers=headers)
+        return respond;

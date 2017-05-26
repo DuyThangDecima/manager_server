@@ -35,7 +35,8 @@ ACTION = {
 FCM_TYPE = {
     "request_location": "request_location",
     "respond_location": "respond_location",
-    "request_upload": "request_upload"
+    "request_upload": "request_upload",
+    "request_update_rule_parent":"request_update_rule_parent"
 }
 
 # msg="error_0": Tương tác với db lỗi

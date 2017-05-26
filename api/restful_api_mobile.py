@@ -14,6 +14,7 @@ from utils import *
 from werkzeug.utils import secure_filename
 from googlecloudstore import *
 
+
 def abort_if_json_request_invalid(request_json, param_keys):
     if not request_json.json:
         abort(404)
@@ -74,14 +75,14 @@ def auth_child_and_device(api_method):
     def function_auth(*args, **kwargs):
         if request.method == 'GET':
             child_id = request.values[notification.PARAMS["child_id"]]
+            device_id = request.values[notification.PARAMS["device_id"]]
         else:
             json_data = request.get_json(force=True)
             child_id = json_data[notification.PARAMS["child_id"]]
+            device_id = json_data[notification.PARAMS["device_id"]]
         db_mongo = kwargs['db_mongo']
         dev_value = kwargs['dev_value']
         device_model = kwargs['device_model']
-
-        device_id = json_data[notification.PARAMS["device_id"]]
 
         # Check childid
         account_id = dev_value[device_model.ACCOUNT_ID]
@@ -332,7 +333,7 @@ class ParentAccountApi(Resource):
         account_model = AccountModel(db_mongo.db)
         # Tìm trong db
         status, value = account_model.find_one(
-            spec={account_model.PARENT + "." + account_model.EMAIL: email,},
+            spec={account_model.PARENT + "." + account_model.EMAIL: email, },
             fields={account_model._ID: 1}
         )
 
@@ -409,7 +410,7 @@ class ChildAccountApi(Resource):
             )
             if not status:
                 return notification.notify_error_db()
-            return jsonify(status=1,child_id=str(object_id),full_name=full_name,birth=birth);
+            return jsonify(status=1, child_id=str(object_id), full_name=full_name, birth=birth);
 
     @require_api_key
     def get(self, **kwargs):
@@ -504,7 +505,7 @@ class ChildAccountApi(Resource):
         return notification.notify_update_successfully()
 
     @require_api_key
-    def delete(self,**kwargs):
+    def delete(self, **kwargs):
         """
         TODO
         Bo me xoa tre con
@@ -848,6 +849,8 @@ class AppApi(JsonResourceApi):
     def insert(self, db_mongo, device_id, child_id, version_client, data):
         super(AppApi, self).insert(db_mongo, device_id, child_id, version_client, data)
         try:
+            print "device_id " + device_id
+            print "child_id " + child_id
             app_model = AppModel(db_mongo.db)
             item = {
                 app_model.DEVICE_ID: device_id,
@@ -905,11 +908,12 @@ class AppApi(JsonResourceApi):
                             }
                         }
                     )
+            version_model = VersionModel(db_mongo.db)
+            version_model.update_version(device_id, child_id, VersionModel.APP_VERSION, version_client)
         except Exception as e:
             print "appApi-insert" + e.message
             return False, e
         return True, None
-
 
 class ContactApi(Resource):
     @require_api_key
@@ -1035,13 +1039,13 @@ class RuleParentApi(Resource):
         dev_value = kwargs['dev_value']
         device_model = kwargs['device_model']
         json_data = kwargs['json_data']
-        privilege = json_data[notification.PARAMS["privilege"]]
+        privilege = int(json_data[notification.PARAMS["privilege"]])
         child_id = json_data[notification.PARAMS["child_id"]]
         # TODO authen child_id
 
         #
         if privilege == notification.PRIVILEGE_TYPE["parent"]:
-            dev_child = device_model.find_one(
+            status, dev_child = device_model.find_one(
                 spec={
                     DeviceModel.ACCOUNT_ID: dev_value[DeviceModel.ACCOUNT_ID]
                 },
@@ -1057,6 +1061,7 @@ class RuleParentApi(Resource):
             )
             if dev_child is not None and len(dev_child) > 0:
                 device_id = dev_child[DeviceModel._ID]
+                token_fcm = dev_child[DeviceModel.TOKEN_FCM]
             else:
                 return notify_error_db()
 
@@ -1091,20 +1096,21 @@ class RuleParentApi(Resource):
                     }
                 }
             )
+        if privilege == notification.PRIVILEGE_TYPE["parent"]:
+            if token_fcm is not None:
+                FCMRequest().send_request_download_rule_parent(token_fcm)
         return notify_update_successfully()
 
     @require_api_key
-    @auth_child_and_device
     def get(self, **kwargs):
         db_mongo = kwargs['db_mongo']
         dev_value = kwargs['dev_value']
         device_model = kwargs['device_model']
-        json_data = kwargs['json_data']
-        privilege = json_data[notification.PARAMS["privilege"]]
-        child_id = kwargs[notification.PARAMS["child_id"]]
+        privilege = int(request.values[notification.PARAMS["privilege"]])
+        child_id = request.values[notification.PARAMS["child_id"]]
         # lay childid
         if privilege == notification.PRIVILEGE_TYPE["parent"]:
-            dev_child = device_model.find_one(
+            status_child,dev_child = device_model.find_one(
                 spec={
                     DeviceModel.ACCOUNT_ID: dev_value[DeviceModel.ACCOUNT_ID]
                 },
@@ -1113,7 +1119,6 @@ class RuleParentApi(Resource):
                         '$elemMatch': {
                             DeviceModel.PRIVILEGE + "." + DeviceModel.PRIVILEGE_TYPE: DeviceModel.PRIVILEGE_CHILD,
                             DeviceModel.PRIVILEGE + "." + DeviceModel.CHILD_ID: child_id,
-
                         }
                     }
                 }
@@ -1122,9 +1127,13 @@ class RuleParentApi(Resource):
                 device_id = dev_child[DeviceModel._ID]
             else:
                 return notify_error_db()
-
         elif privilege == notification.PRIVILEGE_TYPE["child"]:
-            device_id = dev_value[DeviceModel._ID]
+            print dev_value
+            device_id = dev_value[DeviceModel.DEVICES][0][DeviceModel._ID]
+            print device_id
+        elif privilege == notification.PRIVILEGE_TYPE["unknown"]:
+            print "error privilege unknown"
+        print device_id
         rule_model = RuleParentModel(db_mongo.db)
         status, value = rule_model.find_one(
             spec={
@@ -1136,6 +1145,8 @@ class RuleParentApi(Resource):
                 RuleParentModel.TIME_LIMIT_APP: 1
             }
         )
+        print value;
+        value.pop("_id");
         return jsonify(status=1, msg=value)
 
 
@@ -1867,46 +1878,10 @@ class DownloadJsonApi(Resource):
     def post(self, **kwargs):
         """Lấy json"""
         db_mongo = kwargs['db_mongo']
-        # dev_value = kwargs['dev_value']
-        # device_model = kwargs['device_model']
         child_id = kwargs[notification.PARAMS["child_id"]]
         device_id = kwargs[notification.PARAMS["device_id"]]
         json_data = kwargs['json_data']
-        # child_id = json_data[notification.PARAMS["child_id"]]
         version_client = json_data[notification.PARAMS["version"]]
-        # device_id = json_data[notification.PARAMS["device_id"]]
-        #
-        # # Check childid
-        # account_id = dev_value[device_model.ACCOUNT_ID]
-        # account_model = AccountModel(db_mongo.db)
-        # ac_status, ac_value = account_model.find_one(
-        #     spec={
-        #         account_model._ID: account_id,
-        #         account_model.CHILD + "." + account_model._ID: ObjectId(child_id)
-        #     }
-        # )
-        # if not ac_status:
-        #     return notification.notify_error_db()
-        # if ac_value is None or len(ac_value) <= 0:
-        #     abort(400)
-        # if child_id is None or len(child_id) == 0:
-        #     abort(400)
-        #
-        #     # check device_id
-        #     # Kiểm tra device id có phaỉ là của child id này không,
-        #     # Trạng thái có đăng nhập
-        # status_check_device_id, value_check_device_id = device_model.find_one(
-        #     spec={
-        #         DeviceModel.ACCOUNT_ID: account_id,
-        #         DeviceModel.DEVICES + "." + DeviceModel._ID: ObjectId(device_id),
-        #         DeviceModel.DEVICES + "." + DeviceModel.PRIVILEGE + "." + DeviceModel.CHILD_ID: child_id,
-        #         DeviceModel.DEVICES + "." + DeviceModel.PRIVILEGE + "." + DeviceModel.PRIVILEGE_TYPE: DeviceModel.PRIVILEGE_CHILD,
-        #         DeviceModel.DEVICES + "." + DeviceModel.PRIVILEGE + "." + DeviceModel.LATEST_LOGIN: DeviceModel.LATEST_LOGIN_TRUE
-        #     }
-        # )
-        # if value_check_device_id is None or len(value_check_device_id) == 0:
-        #     abort(400)
-
         ids = json_data[notification.PARAMS["data"]]
         return self.retrieve_item(db_mongo, device_id, child_id, ids, version_client);
 
@@ -2038,6 +2013,75 @@ class CallLogDownloader(DownloadJsonApi):
         while index_server < size_server:
             item = call_log_array[index_server];
 
+            item[ACTION["action"]] = ACTION["add"]
+            item["id_server"] = str(item["_id"])
+            item.pop("_id")
+            item.pop(notification.PARAMS["version"])
+
+            result_action.append(item)
+            index_server += 1
+        for item in result_action:
+            print item;
+        return jsonify(status=1, data=result_action)
+
+
+class AppDownloader(DownloadJsonApi):
+    def post(self, **kwargs):
+        return super(AppDownloader, self).post(**kwargs)
+
+    def retrieve_item(self, db_mongo, device_id, child_id, ids, version_client):
+        super(AppDownloader, self).retrieve_item(db_mongo, device_id, child_id, ids, version_client)
+        app_model = AppModel(db_mongo.db);
+
+        ids.sort(key=lambda k: str(k[AppModel._ID]), reverse=False)
+        status, value = app_model.find_one(
+            spec={
+                AppModel.DEVICE_ID: device_id,
+                AppModel.CHILD_ID: child_id
+            }
+        )
+        if not status:
+            return notification.notify_error_db()
+        if value is None:
+            return jsonify(status=1, data=[])
+        app_array = value[AppModel.COLLECTION_NAME]
+        app_array.sort(key=lambda k: str(k[AppModel._ID]), reverse=False)
+
+        index_client = 0
+        size_client = len(ids)
+        index_server = 0
+        size_server = len(app_array);
+        result_action = []
+        while index_client < size_client and index_server < size_server:
+            item = app_array[index_server];
+            id_server = str(item["_id"])
+            # Chuyển object id thành string
+            item[AppModel._ID] = id_server
+            id_client = ids[index_client]["_id"];
+            if id_client == id_server:
+                item[ACTION["action"]] = ACTION["update"]
+                item["id_server"] = str(item["_id"])
+                item.pop("_id")
+                item.pop(notification.PARAMS["version"])
+                result_action.append(item)
+                index_client += 1
+                index_server += 1
+            elif id_client < id_server:
+                index_client += 1
+                result_action.append({ACTION["action"]: ACTION["delete"], AppModel._ID: id_client})
+            elif id_client > id_server:
+                item[ACTION["action"]] = ACTION["add"]
+                item["id_server"] = str(item["_id"])
+                item.pop("_id")
+                index_server += 1
+                result_action.append(item)
+
+        while index_client < size_client:
+            result_action.append({AppModel._ID: ids[index_client], ACTION["action"]: ACTION["delete"]})
+            index_client += 1
+
+        while index_server < size_server:
+            item = app_array[index_server];
             item[ACTION["action"]] = ACTION["add"]
             item["id_server"] = str(item["_id"])
             item.pop("_id")
@@ -2376,8 +2420,9 @@ def register_extra(app):
         device_name = json_data[notification.PARAMS["device_name"]]
 
         # Khi dang nhap thanh cong roi
-        privilege = json_data[notification.PARAMS["privilege"]]
+        privilege = int(json_data[notification.PARAMS["privilege"]])
         if privilege == notification.PRIVILEGE_TYPE["parent"]:
+            print "privilege parent"
             # Neu tai khoan vua chon la parent
             # TODO Them thiet bi can gui notification
             device_model.update_one(
@@ -2397,6 +2442,7 @@ def register_extra(app):
             )
             return jsonify(status=1)
         elif privilege == notification.PRIVILEGE_TYPE["child"]:
+            print "privilege child"
             # Neu do la tai khoan tre con, logout cac tai khoan khac
             child_id = json_data[notification.PARAMS["child_id"]]
             device_model.update_many(
